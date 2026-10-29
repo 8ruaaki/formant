@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>フォルマント散布図プロッター (F1-F2 Formant Plotter)</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+    body {
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- ヘッダー -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-100">
+          <i data-lucide="activity" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 leading-tight">フォルマント散布図プロッター</h1>
+          <p class="text-xs text-slate-500">F1-F2 Acoustic Vowel Formant Visualizer</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="downloadBtn" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium rounded-lg transition-colors border border-slate-300 shadow-sm">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>グラフ保存 (PNG)</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- 左カラム: データ入力 & リスト (5カラム) -->
+    <div class="lg:col-span-5 flex flex-col gap-6">
+
+      <!-- 入力カード -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+        <h2 class="text-base font-semibold text-slate-900 flex items-center gap-2 mb-4">
+          <i data-lucide="plus-circle" class="w-5 h-5 text-indigo-600"></i>
+          プロット追加
+        </h2>
+
+        <form id="addForm" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">ラベル / 母音表記</label>
+            <input type="text" id="labelInput" placeholder="例: /a/, [i], 語彙など" required
+              class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">
+                F1 (Hz) <span class="text-slate-400 font-normal">[母音の高さ]</span>
+              </label>
+              <input type="number" id="f1Input" placeholder="例: 750" min="50" max="3500" step="1" required
+                class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">
+                F2 (Hz) <span class="text-slate-400 font-normal">[母音の前舌度]</span>
+              </label>
+              <input type="number" id="f2Input" placeholder="例: 1250" min="200" max="4500" step="1" required
+                class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+            </div>
+          </div>
+
+          <!-- 10色カラーパレット -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-2">プロット色 (10色から選択)</label>
+            <div id="colorPalette" class="grid grid-cols-5 gap-2">
+              <!-- カラーボタン群 (JSで自動生成) -->
+            </div>
+            <input type="hidden" id="selectedColor" value="#ef4444">
+          </div>
+
+          <!-- 追加ボタン -->
+          <button type="submit" class="w-full mt-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm rounded-lg shadow-sm shadow-indigo-200 transition-colors flex items-center justify-center gap-2">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            プロットを追加する
+          </button>
+        </form>
+
+        <!-- プリセットボタン -->
+        <div class="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+          <span class="text-xs text-slate-500">サンプルデータ:</span>
+          <div class="flex gap-2">
+            <button type="button" id="presetMaleBtn" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-2.5 py-1.5 rounded-md transition-colors">
+              日本語 成人男性5母音
+            </button>
+            <button type="button" id="presetFemaleBtn" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-2.5 py-1.5 rounded-md transition-colors">
+              日本語 成人女性5母音
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 登録データ一覧リスト & 消去機能 -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 flex-1 flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <h2 class="text-base font-semibold text-slate-900 flex items-center gap-2">
+              <i data-lucide="list" class="w-5 h-5 text-indigo-600"></i>
+              データ一覧
+            </h2>
+            <span id="dataCountBadge" class="text-xs bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-full">0件</span>
+          </div>
+          <button id="clearAllBtn" class="text-xs text-rose-600 hover:text-rose-700 font-medium hover:underline flex items-center gap-1 transition-colors">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            全件消去
+          </button>
+        </div>
+
+        <!-- テーブルコンテナ -->
+        <div class="flex-1 overflow-y-auto max-h-[300px] border border-slate-200 rounded-lg">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-semibold sticky top-0 border-b border-slate-200">
+              <tr>
+                <th class="px-3 py-2">色</th>
+                <th class="px-3 py-2">ラベル</th>
+                <th class="px-3 py-2">F1</th>
+                <th class="px-3 py-2">F2</th>
+                <th class="px-3 py-2 text-right">消去</th>
+              </tr>
+            </thead>
+            <tbody id="dataTableBody" class="divide-y divide-slate-100 font-mono">
+              <!-- JSで動的に追加 -->
+            </tbody>
+          </table>
+          <div id="emptyState" class="py-10 text-center text-slate-400 text-xs">
+            登録されたフォルマントデータがありません
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 右カラム: 散布図グラフ & 軸設定 (7カラム) -->
+    <div class="lg:col-span-7 flex flex-col gap-6">
+
+      <!-- グラフカード -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 flex flex-col">
+        
+        <!-- コントロールバー -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
+          <div>
+            <h2 class="text-base font-semibold text-slate-900 flex items-center gap-2">
+              <i data-lucide="scatter-chart" class="w-5 h-5 text-indigo-600"></i>
+              母音四辺形 / 散布図 (F1 × F2)
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">X: F2 (Hz) / Y: F1 (Hz)</p>
+          </div>
+
+          <!-- 音声学標準反転トグルスイッチ -->
+          <label class="inline-flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
+            <input type="checkbox" id="phoneticOrientationToggle" class="sr-only peer" checked>
+            <div class="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+            <span class="text-xs font-semibold text-slate-700">音声学標準軸 (反転)</span>
+          </label>
+        </div>
+
+        <!-- グラフ描画エリア -->
+        <div class="relative w-full h-[400px] sm:h-[480px]">
+          <canvas id="formantCanvas"></canvas>
+        </div>
+
+        <!-- 軸のスケール調整設定 -->
+        <div class="mt-4 pt-4 border-t border-slate-100">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <i data-lucide="sliders" class="w-3.5 h-3.5 text-slate-500"></i>
+              軸スケール設定
+            </span>
+            <button id="resetAxisBtn" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+              自動範囲に戻す
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div>
+              <label class="block text-slate-500 mb-1">F1 最小 (Hz)</label>
+              <input type="number" id="f1Min" placeholder="Auto" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-md">
+            </div>
+            <div>
+              <label class="block text-slate-500 mb-1">F1 最大 (Hz)</label>
+              <input type="number" id="f1Max" placeholder="Auto" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-md">
+            </div>
+            <div>
+              <label class="block text-slate-500 mb-1">F2 最小 (Hz)</label>
+              <input type="number" id="f2Min" placeholder="Auto" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-md">
+            </div>
+            <div>
+              <label class="block text-slate-500 mb-1">F2 最大 (Hz)</label>
+              <input type="number" id="f2Max" placeholder="Auto" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-md">
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 音声学的解説カード -->
+      <div class="bg-indigo-50/60 rounded-xl border border-indigo-100 p-4 text-xs text-indigo-900 leading-relaxed">
+        <span class="font-bold block mb-1">💡 音声学におけるF1-F2母音プロットの読み方</span>
+        <ul class="list-disc list-inside space-y-0.5 text-indigo-800">
+          <li><strong>F1（第1フォルマント）:</strong> 舌の高さ・顎の開き（狭母音／広母音）と相関。上方向に低周波（狭母音 [i, u]）、下方向に高周波（広母音 [a]）を配置します。</li>
+          <li><strong>F2（第2フォルマント）:</strong> 舌の前後位置（前舌／後舌母音）と相関。左方向に高周波（前舌母音 [i, e]）、右方向に低周波（後舌母音 [u, o]）を配置することで、伝統的な母音四辺形と形状が一致します。</li>
+        </ul>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script>
+    // 10色のカラーパレット定義
+    const COLOR_PALETTE = [
+      { name: 'レッド', hex: '#ef4444' },
+      { name: 'ブルー', hex: '#3b82f6' },
+      { name: 'エメラルド', hex: '#10b981' },
+      { name: 'オレンジ', hex: '#f97316' },
+      { name: 'パープル', hex: '#8b5cf6' },
+      { name: 'ピンク', hex: '#ec4899' },
+      { name: 'アンバー', hex: '#eab308' },
+      { name: 'シアン', hex: '#06b6d4' },
+      { name: 'ブラウン', hex: '#854d0e' },
+      { name: 'スレート', hex: '#64748b' }
+    ];
+
+    // 日本語平均フォルマント参考データ
+    const PRESET_MALE = [
+      { label: '/i/ (い)', f1: 280, f2: 2250, color: '#3b82f6' },
+      { label: '/e/ (え)', f1: 500, f2: 1850, color: '#10b981' },
+      { label: '/a/ (あ)', f1: 750, f2: 1250, color: '#ef4444' },
+      { label: '/o/ (お)', f1: 520, f2: 850, color: '#f97316' },
+      { label: '/u/ (う)', f1: 360, f2: 1300, color: '#8b5cf6' }
+    ];
+
+    const PRESET_FEMALE = [
+      { label: '/i/ (い)', f1: 340, f2: 2750, color: '#3b82f6' },
+      { label: '/e/ (え)', f1: 570, f2: 2300, color: '#10b981' },
+      { label: '/a/ (あ)', f1: 880, f2: 1400, color: '#ef4444' },
+      { label: '/o/ (お)', f1: 590, f2: 950, color: '#f97316' },
+      { label: '/u/ (う)', f1: 420, f2: 1450, color: '#8b5cf6' }
+    ];
+
+    // プロットデータの保持
+    let dataPoints = [
+      { id: '1', label: '/i/ (い)', f1: 280, f2: 2250, color: '#3b82f6' },
+      { label: '/e/ (え)', f1: 500, f2: 1850, color: '#10b981', id: '2' },
+      { label: '/a/ (あ)', f1: 750, f2: 1250, color: '#ef4444', id: '3' },
+      { label: '/o/ (お)', f1: 520, f2: 850, color: '#f97316', id: '4' },
+      { label: '/u/ (う)', f1: 360, f2: 1300, color: '#8b5cf6', id: '5' }
+    ];
+
+    // Chart.js インスタンス
+    let chartInstance = null;
+
+    // キャンバス上のプロット点近くに常時テキストラベルを描画するプラグイン
+    const customLabelsPlugin = {
+      id: 'customLabelsPlugin',
+      afterDatasetsDraw(chart) {
+        const { ctx, scales: { x, y } } = chart;
+        ctx.save();
+        ctx.font = '600 12px "Inter", "Noto Sans JP", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+
+        chart.data.datasets.forEach(dataset => {
+          const meta = chart.getDatasetMeta(0);
+          meta.data.forEach((element, index) => {
+            const item = dataset.data[index];
+            if (!item) return;
+
+            const px = element.x;
+            const py = element.y;
+
+            // ラベルの背景ピルを描画して見やすくする
+            const text = item.label;
+            const metrics = ctx.measureText(text);
+            const textWidth = metrics.width;
+            const boxPaddingX = 6;
+            const boxHeight = 18;
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.shadowColor = 'rgba(0,0,0,0.08)';
+            ctx.shadowBlur = 4;
+            ctx.beginPath();
+            ctx.roundRect(px - textWidth / 2 - boxPaddingX, py - 24, textWidth + boxPaddingX * 2, boxHeight, 4);
+            ctx.fill();
+
+            // ラベルテキスト描画
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#0f172a';
+            ctx.fillText(text, px, py - 10);
+          });
+        });
+        ctx.restore();
+      }
+    };
+
+    // 初期化処理
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      renderColorPalette();
+      initChart();
+      updateTableAndChart();
+      setupEventListeners();
+    });
+
+    // 10色のカラーパレットUI構築
+    function renderColorPalette() {
+      const container = document.getElementById('colorPalette');
+      const selectedInput = document.getElementById('selectedColor');
+
+      COLOR_PALETTE.forEach((col, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.title = col.name;
+        btn.className = `h-7 rounded-md transition-all flex items-center justify-center border-2 ${
+          idx === 0 ? 'ring-2 ring-indigo-500 scale-105 border-white' : 'border-transparent'
+        }`;
+        btn.style.backgroundColor = col.hex;
+
+        btn.addEventListener('click', () => {
+          container.querySelectorAll('button').forEach(b => {
+            b.classList.remove('ring-2', 'ring-indigo-500', 'scale-105', 'border-white');
+            b.classList.add('border-transparent');
+          });
+          btn.classList.add('ring-2', 'ring-indigo-500', 'scale-105', 'border-white');
+          btn.classList.remove('border-transparent');
+          selectedInput.value = col.hex;
+        });
+
+        container.appendChild(btn);
+      });
+    }
+
+    // Chart.js の初期化
+    function initChart() {
+      const ctx = document.getElementById('formantCanvas').getContext('2d');
+      const isPhonetic = document.getElementById('phoneticOrientationToggle').checked;
+
+      chartInstance = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            label: 'フォルマントプロット',
+            data: [],
+            pointBackgroundColor: [],
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 7,
+            pointHoverRadius: 9
+          }]
+        },
+        plugins: [customLabelsPlugin],
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: {
+            duration: 300
+          },
+          layout: {
+            padding: {
+              top: 25,
+              right: 25,
+              bottom: 10,
+              left: 10
+            }
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              position: 'bottom',
+              reverse: isPhonetic, // 音声学標準では左側が高周波
+              title: {
+                display: true,
+                text: 'F2 (第2フォルマント / 前後) [Hz]',
+                font: { weight: '600', size: 12 },
+                color: '#475569'
+              },
+              grid: {
+                color: '#f1f5f9'
+              }
+            },
+            y: {
+              type: 'linear',
+              position: 'left',
+              reverse: isPhonetic, // 音声学標準では上側が低周波 (狭母音)
+              title: {
+                display: true,
+                text: 'F1 (第1フォルマント / 高さ) [Hz]',
+                font: { weight: '600', size: 12 },
+                color: '#475569'
+              },
+              grid: {
+                color: '#f1f5f9'
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+              titleFont: { size: 13, weight: '700' },
+              bodyFont: { size: 12 },
+              padding: 10,
+              displayColors: true,
+              callbacks: {
+                title: function(items) {
+                  const raw = items[0].raw;
+                  return raw.label || '無題';
+                },
+                label: function(item) {
+                  return [
+                    ` F1: ${item.parsed.y} Hz`,
+                    ` F2: ${item.parsed.x} Hz`
+                  ];
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // テーブル描画とチャート更新
+    function updateTableAndChart() {
+      const tbody = document.getElementById('dataTableBody');
+      const emptyState = document.getElementById('emptyState');
+      const badge = document.getElementById('dataCountBadge');
+
+      tbody.innerHTML = '';
+      badge.textContent = `${dataPoints.length}件`;
+
+      if (dataPoints.length === 0) {
+        emptyState.style.display = 'block';
+      } else {
+        emptyState.style.display = 'none';
+
+        dataPoints.forEach((item) => {
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-slate-50 transition-colors';
+
+          tr.innerHTML = `
+            <td class="px-3 py-2.5">
+              <span class="inline-block w-4 h-4 rounded-full border border-slate-300 shadow-sm align-middle" style="background-color: ${item.color};"></span>
+            </td>
+            <td class="px-3 py-2.5 font-sans font-medium text-slate-800">${escapeHtml(item.label)}</td>
+            <td class="px-3 py-2.5 text-slate-600">${item.f1}</td>
+            <td class="px-3 py-2.5 text-slate-600">${item.f2}</td>
+            <td class="px-3 py-2.5 text-right">
+              <button data-id="${item.id}" class="delete-btn p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition-colors" title="このプロットを消去">
+                <i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i>
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        // 削除ボタンイベント付与
+        tbody.querySelectorAll('.delete-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.getAttribute('data-id');
+            deletePoint(id);
+          });
+        });
+      }
+
+      lucide.createIcons();
+      refreshChartData();
+    }
+
+    // チャートデータ・スケールの同期
+    function refreshChartData() {
+      const isPhonetic = document.getElementById('phoneticOrientationToggle').checked;
+
+      // 軸反転設定
+      chartInstance.options.scales.x.reverse = isPhonetic;
+      chartInstance.options.scales.y.reverse = isPhonetic;
+
+      // 手動軸値の適用
+      const f1Min = parseFloat(document.getElementById('f1Min').value);
+      const f1Max = parseFloat(document.getElementById('f1Max').value);
+      const f2Min = parseFloat(document.getElementById('f2Min').value);
+      const f2Max = parseFloat(document.getElementById('f2Max').value);
+
+      chartInstance.options.scales.y.min = !isNaN(f1Min) ? f1Min : undefined;
+      chartInstance.options.scales.y.max = !isNaN(f1Max) ? f1Max : undefined;
+      chartInstance.options.scales.x.min = !isNaN(f2Min) ? f2Min : undefined;
+      chartInstance.options.scales.x.max = !isNaN(f2Max) ? f2Max : undefined;
+
+      // データセットの生成
+      const dataset = chartInstance.data.datasets[0];
+      dataset.data = dataPoints.map(p => ({
+        x: p.f2,
+        y: p.f1,
+        label: p.label
+      }));
+      dataset.pointBackgroundColor = dataPoints.map(p => p.color);
+
+      chartInstance.update();
+    }
+
+    // 単一データの削除
+    function deletePoint(id) {
+      dataPoints = dataPoints.filter(p => p.id !== id);
+      updateTableAndChart();
+    }
+
+    // 全件削除
+    function clearAllPoints() {
+      if (dataPoints.length === 0) return;
+      dataPoints = [];
+      updateTableAndChart();
+    }
+
+    // イベントリスナーの設定
+    function setupEventListeners() {
+      // フォーム追加
+      document.getElementById('addForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const label = document.getElementById('labelInput').value.trim();
+        const f1 = parseFloat(document.getElementById('f1Input').value);
+        const f2 = parseFloat(document.getElementById('f2Input').value);
+        const color = document.getElementById('selectedColor').value;
+
+        if (!label || isNaN(f1) || isNaN(f2)) return;
+
+        const newPoint = {
+          id: Date.now().toString(),
+          label,
+          f1,
+          f2,
+          color
+        };
+
+        dataPoints.push(newPoint);
+        updateTableAndChart();
+
+        // フォームリセット (ラベルと数値のみクリアして入力高速化)
+        document.getElementById('labelInput').value = '';
+        document.getElementById('f1Input').value = '';
+        document.getElementById('f2Input').value = '';
+        document.getElementById('labelInput').focus();
+      });
+
+      // 全件消去ボタン
+      document.getElementById('clearAllBtn').addEventListener('click', clearAllPoints);
+
+      // 音声学標準反転トグル
+      document.getElementById('phoneticOrientationToggle').addEventListener('change', () => {
+        refreshChartData();
+      });
+
+      // 軸範囲手動入力
+      ['f1Min', 'f1Max', 'f2Min', 'f2Max'].forEach(id => {
+        document.getElementById(id).addEventListener('input', () => {
+          refreshChartData();
+        });
+      });
+
+      // 軸範囲リセットボタン
+      document.getElementById('resetAxisBtn').addEventListener('click', () => {
+        document.getElementById('f1Min').value = '';
+        document.getElementById('f1Max').value = '';
+        document.getElementById('f2Min').value = '';
+        document.getElementById('f2Max').value = '';
+        refreshChartData();
+      });
+
+      // プリセット追加
+      document.getElementById('presetMaleBtn').addEventListener('click', () => {
+        applyPreset(PRESET_MALE);
+      });
+      document.getElementById('presetFemaleBtn').addEventListener('click', () => {
+        applyPreset(PRESET_FEMALE);
+      });
+
+      // 画像ダウンロード (PNG)
+      document.getElementById('downloadBtn').addEventListener('click', () => {
+        const link = document.createElement('a');
+        link.download = `formant-plot-${new Date().toISOString().slice(0, 10)}.png`;
+        link.href = chartInstance.toBase64Image('image/png', 1.0);
+        link.click();
+      });
+    }
+
+    // プリセット適用
+    function applyPreset(presetArray) {
+      dataPoints = presetArray.map((p, idx) => ({
+        ...p,
+        id: (Date.now() + idx).toString()
+      }));
+      updateTableAndChart();
+    }
+
+    // XSSサニタイズ補助
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
